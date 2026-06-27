@@ -75,7 +75,9 @@ export default function Progress() {
 
   function getWeekNumber(date: Date) {
     const start = new Date(date.getFullYear(), 0, 1)
-    return Math.ceil(((date.getTime() - start.getTime()) / 86400000 + start.getDay() + 1) / 7)
+    const diff = date.getTime() - start.getTime()
+    const oneWeek = 1000 * 60 * 60 * 24 * 7
+    return Math.floor(diff / oneWeek) + 1
   }
 
 //   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -160,12 +162,12 @@ const VolumeTooltip = ({ active, payload, label }: any) => {
               <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 14 }}>No workout data yet</p>
             ) : (
               <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={frequencyData}>
+                <BarChart data={frequencyData} >
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
                   <XAxis dataKey="week" tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 12 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 12 }} axisLine={false} tickLine={false} />
-                  <Tooltip content={<FrequencyTooltip />} />
-                  <Bar dataKey="workouts" fill="#63b4ff" radius={[6, 6, 0, 0]} />
+                  <YAxis tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 12 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                  <Tooltip content={<FrequencyTooltip />} cursor={{ fill: 'rgba(99,180,255,0.08)' }} />
+                  <Bar dataKey="workouts" fill="#63b4ff" radius={[6, 6, 0, 0]} cursor="pointer" activeBar={{ fill: '#63b4ff', opacity: 0.8 }} />
                 </BarChart>
               </ResponsiveContainer>
             )}
