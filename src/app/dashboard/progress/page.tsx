@@ -31,6 +31,7 @@ export default function Progress() {
 
     // Volume per workout
     const volumeByWorkout: VolumeData[] = []
+    
     for (const w of workouts) {
       const { data: sets } = await supabase
         .from('sets')
