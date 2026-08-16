@@ -5,17 +5,41 @@ import { createClient } from '@/lib/supabase'
 type Message = { role: 'user' | 'assistant'; content: string }
 
 export default function Coach() {
-  const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: "Hey, I'm your Zenth Coach. I have access to your training data — ask me anything about your workouts, progress, programming, or recovery." }
-  ])
+  const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [context, setContext] = useState('')
+  const [saved, setSaved] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
 
-  useEffect(() => { buildContext() }, [])
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
+  useEffect(() => {
+    async function init() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data } = await supabase
+          .from('coach_conversations')
+          .select('messages')
+          .eq('user_id', user.id)
+          .single()
+        if (data?.messages) {
+          setMessages(JSON.parse(data.messages))
+          localStorage.setItem('zenth-coach-messages', data.messages)
+        } else {
+          const stored = localStorage.getItem('zenth-coach-messages')
+          if (stored) setMessages(JSON.parse(stored))
+          else setMessages([{ role: 'assistant', content: "Hey, I'm your Zenth Coach. I have access to your training data — ask me anything about your workouts, progress, programming, or recovery." }])
+        }
+      }
+      buildContext()
+    }
+    init()
+  }, [])
+
+  useEffect(() => {
+    if (messages.length > 1) localStorage.setItem('zenth-coach-messages', JSON.stringify(messages))
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
 
   async function buildContext() {
     const { data: workouts } = await supabase
@@ -53,7 +77,7 @@ export default function Coach() {
       .select('weight, reps, workout_exercises(exercise:exercises(name))')
       .eq('completed', true)
       .order('weight', { ascending: false })
-      .limit(50)
+      .limit(10)
 
     const prMap: Record<string, number> = {}
     for (const s of (prs || []) as any[]) {
@@ -65,6 +89,26 @@ export default function Coach() {
     Object.entries(prMap).forEach(([ex, weight]) => { ctx += `- ${ex}: ${weight}kg\n` })
 
     setContext(ctx)
+  }
+
+  async function saveToDatabase() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const { error } = await supabase
+      .from('coach_conversations')
+      .upsert({
+        user_id: user.id,
+        messages: JSON.stringify(messages),
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id' })
+
+    if (!error) { setSaved(true); setTimeout(() => setSaved(false), 2000) }
+  }
+
+  async function clearChat() {
+    localStorage.removeItem('zenth-coach-messages')
+    setMessages([{ role: 'assistant', content: "Hey, I'm your Zenth Coach. I have access to your training data — ask me anything about your workouts, progress, programming, or recovery." }])
   }
 
   async function sendMessage() {
@@ -124,9 +168,24 @@ export default function Coach() {
           <h1 style={{ fontFamily: "'Syne',sans-serif", fontSize: 18, fontWeight: 800, color: '#fff' }}>Zenth Coach</h1>
           <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>AI powered by your training data</p>
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#63ffb4', animation: 'pulse 2s infinite' }} />
-          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>Online</span>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={clearChat} style={{
+            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 8, padding: '6px 12px', color: 'rgba(255,255,255,0.4)',
+            fontSize: 12, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif"
+          }}>Clear</button>
+          <button onClick={saveToDatabase} style={{
+            background: saved ? 'rgba(99,255,180,0.1)' : 'rgba(255,255,255,0.04)',
+            border: `1px solid ${saved ? 'rgba(99,255,180,0.3)' : 'rgba(255,255,255,0.08)'}`,
+            borderRadius: 8, padding: '6px 12px',
+            color: saved ? '#63ffb4' : 'rgba(255,255,255,0.4)',
+            fontSize: 12, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif",
+            transition: 'all 0.2s'
+          }}>{saved ? '✓ Saved' : 'Save to Cloud'}</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#63ffb4', animation: 'pulse 2s infinite' }} />
+            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>Online</span>
+          </div>
         </div>
       </div>
 
